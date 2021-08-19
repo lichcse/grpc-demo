@@ -1,0 +1,18 @@
+protoc:
+  version: 3.11.0
+  includes:
+    - ../../../pkg/mod/github.com/grpc-ecosystem/grpc-gateway/v2@v2.2.0/third_party/googleapis
+
+generate:
+  go_options:
+    import_path: grpc-demo/protos
+
+  plugins:
+    - name: go
+      output: ../protobuf
+
+    - name: go-grpc
+      output: ../protobuf
+
+    - name: grpc-gateway
+      output: ../protobuf

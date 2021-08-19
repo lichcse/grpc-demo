@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package demo.notication.v2;
+option go_package = "notification/v2";
+import "google/api/annotations.proto";
+
+service NoticationService {
+  rpc SendMessage(ClientRequest) returns (ServerResponse) {
+    option (google.api.http) = {
+      post: "/notification/v2/send-message"
+      body: "*"
+    };
+  };
+  rpc ClientStreaming(stream ClientRequest) returns (ServerResponse){}
+  rpc ServerStreaming(ClientRequest) returns (stream ServerResponse){}
+  rpc BidirectionStreaming(stream ClientRequest) returns (stream ServerResponse){}
+}
+
+// Base
+message ClientRequest {
+  string message = 1;
+}
+
+message ServerResponse {
+  int32 status = 1;
+  string message = 2;
+}
