@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -44,7 +45,20 @@ func RunGrpcServer(ctx context.Context, port string) error {
 	healthcheckDeliveryGrpc.NewHealthCheckHandler(server, healthcheckUsecase)
 	// register notification usecase
 	notificationUsecase := notification_usecase.NewNotificationUsecase()
-	notificationDeliveryGrpc.NewNotificationHandler(server, notificationUsecase)
+	nu := notificationDeliveryGrpc.NewNotificationUserHandler(server, notificationUsecase)
+
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		count := 0
+		for range ticker.C {
+			count++
+			if count%2 == 0 {
+				nu.SendUserMessage(2, fmt.Sprintf("[***SERVER***]Test - %d", time.Now().Unix()))
+				continue
+			}
+			nu.SendUserMessage(1, fmt.Sprintf("[***SERVER***]Test - %d", time.Now().Unix()))
+		}
+	}()
 
 	reflection.Register(server)
 	fmt.Println("Starting GRPC server...")
