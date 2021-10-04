@@ -11,13 +11,15 @@ import (
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/grpc"
 )
 
 type NotificationUserHandler struct {
 	pb.UnimplementedNoticationServiceServer
-	usecase usecase.INotificationUseCase
-	users   sync.Map
+	usecase       usecase.INotificationUseCase
+	users         sync.Map
+	usersLRUCache *lru.Cache
 }
 
 type userStream struct {
@@ -27,7 +29,8 @@ type userStream struct {
 
 // NewNotificationUserHandler ...
 func NewNotificationUserHandler(gserver *grpc.Server, uc usecase.INotificationUseCase) *NotificationUserHandler {
-	server := &NotificationUserHandler{usecase: uc}
+	newLRU, _ := lru.New(128)
+	server := &NotificationUserHandler{usecase: uc, usersLRUCache: newLRU}
 	pb.RegisterNoticationServiceServer(gserver, server)
 	return server
 }
@@ -95,6 +98,7 @@ func (n *NotificationUserHandler) BidirectionStreaming(stream pb.NoticationServi
 
 		close := make(chan bool)
 		n.users.Store(req.Id, userStream{stream: stream, close: close})
+		n.usersLRUCache.Add(req.Id, userStream{stream: stream, close: close})
 
 		stream.Send(&pb.ServerResponse{Status: 1, Message: mess})
 		stream.Send(&pb.ServerResponse{
@@ -111,6 +115,7 @@ func (n *NotificationUserHandler) BidirectionStreaming(stream pb.NoticationServi
 			case <-ctx.Done():
 				log.Printf("Client ID %d has disconnected", req.Id)
 				n.users.Delete(req.Id)
+				n.usersLRUCache.Remove(req.Id)
 				return nil
 			}
 		}
@@ -119,7 +124,10 @@ func (n *NotificationUserHandler) BidirectionStreaming(stream pb.NoticationServi
 
 func (n *NotificationUserHandler) SendUserMessage(ID int64, mess string) error {
 	fmt.Printf("ID: %d - Mess: %s\n", ID, mess)
-	s, ok := n.users.Load(ID)
+	// map
+	// s, ok := n.users.Load(ID)
+	// lru
+	s, ok := n.usersLRUCache.Get(ID)
 	if !ok {
 		fmt.Printf("Load user stream fail [%d]\n", ID)
 		return nil
